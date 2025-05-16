@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
 export type Course = {
   id: string;
@@ -44,8 +45,8 @@ export function useCourses(filters?: CourseFilters) {
       setError(null);
       
       try {
-        // Use the generic type argument explicitly to avoid excessive type instantiation
-        let query = supabase.from('courses');
+        // Start a query for courses
+        let query = supabase.from('courses').select();
         
         // Apply filters if provided
         if (filters) {
@@ -66,7 +67,8 @@ export function useCourses(filters?: CourseFilters) {
           }
         }
         
-        const { data, error: coursesError } = await query.select().order('created_at', { ascending: false });
+        // Order by created_at and execute the query
+        const { data, error: coursesError } = await query.order('created_at', { ascending: false });
         
         if (coursesError) {
           throw coursesError;
@@ -77,7 +79,7 @@ export function useCourses(filters?: CourseFilters) {
           (data as Course[]).map(async (course) => {
             const { data: lessonsData, error: lessonsError } = await supabase
               .from('lessons')
-              .select('*')
+              .select()
               .eq('course_id', course.id)
               .order('lesson_title', { ascending: true });
             
@@ -124,7 +126,7 @@ export function useCourse(id: string) {
       try {
         const { data, error: courseError } = await supabase
           .from('courses')
-          .select('*')
+          .select()
           .eq('id', id)
           .single();
         
@@ -135,7 +137,7 @@ export function useCourse(id: string) {
         // Get lessons for the course
         const { data: lessonsData, error: lessonsError } = await supabase
           .from('lessons')
-          .select('*')
+          .select()
           .eq('course_id', id)
           .order('lesson_title', { ascending: true });
           

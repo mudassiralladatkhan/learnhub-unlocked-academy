@@ -1,4 +1,3 @@
-
 import { Tab } from '@headlessui/react';
 import { CourseCard } from '@/components/courses/CourseCard';
 import { Progress } from '@/components/ui/progress';
@@ -75,6 +74,7 @@ export default function MyLearningPage() {
           
           <Tab.Panels>
             <Tab.Panel>
+              {/* Panel for In Progress courses */}
               {inProgress.length === 0 ? (
                 <div className="text-center py-12 bg-white dark:bg-brand-900/40 rounded-lg shadow-sm border border-border">
                   <h3 className="text-xl font-medium mb-2">No courses in progress</h3>
@@ -135,6 +135,7 @@ export default function MyLearningPage() {
               )}
             </Tab.Panel>
             <Tab.Panel>
+              {/* Panel for Completed courses */}
               {completed.length === 0 ? (
                 <div className="text-center py-12 bg-white dark:bg-brand-900/40 rounded-lg shadow-sm border border-border">
                   <h3 className="text-xl font-medium mb-2">No completed courses</h3>
@@ -155,7 +156,7 @@ export default function MyLearningPage() {
                       difficulty={enrollment.course?.difficulty || 'beginner'}
                       duration={enrollment.course?.duration || 0}
                       thumbnail={enrollment.course?.thumbnail}
-                      created_at={enrollment.started_at} /* Add the required created_at field */
+                      created_at={enrollment.started_at} 
                       enrolled={true}
                       progress={100}
                     />
