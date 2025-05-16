@@ -44,7 +44,8 @@ export function useCourses(filters?: CourseFilters) {
       setError(null);
       
       try {
-        let query = supabase.from('courses').select('*');
+        // Use the generic type argument explicitly to avoid excessive type instantiation
+        let query = supabase.from('courses');
         
         // Apply filters if provided
         if (filters) {
@@ -65,7 +66,7 @@ export function useCourses(filters?: CourseFilters) {
           }
         }
         
-        const { data, error: coursesError } = await query.order('created_at', { ascending: false });
+        const { data, error: coursesError } = await query.select().order('created_at', { ascending: false });
         
         if (coursesError) {
           throw coursesError;
