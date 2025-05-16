@@ -44,30 +44,31 @@ export function useCourses(filters?: CourseFilters) {
       setError(null);
       
       try {
-        // Start building the query
-        let query = supabase.from('courses').select();
+        // Fetch all courses first
+        const query = supabase.from('courses');
         
-        // Apply filters if provided
-        if (filters) {
-          if (filters.search) {
-            query = query.ilike('title', `%${filters.search}%`);
-          }
-          
-          if (filters.category && filters.category !== 'all') {
-            query = query.eq('category', filters.category);
-          }
-          
-          if (filters.difficulty && filters.difficulty !== 'all') {
-            query = query.eq('difficulty', filters.difficulty);
-          }
-          
-          if (filters.instructor && filters.instructor !== 'all') {
-            query = query.eq('instructor', filters.instructor);
-          }
+        // Apply search filter if provided
+        let filteredQuery = query.select();
+        
+        // Apply filters separately to avoid deep type instantiation
+        if (filters?.search) {
+          filteredQuery = filteredQuery.ilike('title', `%${filters.search}%`);
+        }
+        
+        if (filters?.category && filters.category !== 'all') {
+          filteredQuery = filteredQuery.eq('category', filters.category);
+        }
+        
+        if (filters?.difficulty && filters.difficulty !== 'all') {
+          filteredQuery = filteredQuery.eq('difficulty', filters.difficulty);
+        }
+        
+        if (filters?.instructor && filters.instructor !== 'all') {
+          filteredQuery = filteredQuery.eq('instructor', filters.instructor);
         }
         
         // Execute the query with ordering
-        const { data, error: coursesError } = await query.order('created_at', { ascending: false });
+        const { data, error: coursesError } = await filteredQuery.order('created_at', { ascending: false });
         
         if (coursesError) {
           throw coursesError;
