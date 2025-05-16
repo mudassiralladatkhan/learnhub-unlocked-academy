@@ -1,19 +1,28 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export type Course = {
   id: string;
   title: string;
   description: string;
-  instructor: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  instructor?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
   category: string;
-  duration: number;
-  thumbnail: string | null;
+  duration?: number;
+  thumbnail?: string | null;
   created_at: string;
   rating?: number;
+  lessons?: Lesson[];
+};
+
+export type Lesson = {
+  id: string;
+  course_id: string;
+  lesson_title: string;
+  video_url: string;
+  created_at: string;
 };
 
 type CourseFilters = {
@@ -43,15 +52,15 @@ export function useCourses(filters?: CourseFilters) {
             query = query.ilike('title', `%${filters.search}%`);
           }
           
-          if (filters.category) {
+          if (filters.category && filters.category !== 'all') {
             query = query.eq('category', filters.category);
           }
           
-          if (filters.difficulty) {
+          if (filters.difficulty && filters.difficulty !== 'all') {
             query = query.eq('difficulty', filters.difficulty);
           }
           
-          if (filters.instructor) {
+          if (filters.instructor && filters.instructor !== 'all') {
             query = query.eq('instructor', filters.instructor);
           }
         }
@@ -61,30 +70,26 @@ export function useCourses(filters?: CourseFilters) {
         if (error) {
           throw error;
         }
-        
-        // Get ratings for courses
-        const coursesWithRatings = await Promise.all(
+
+        // Get lessons for each course
+        const coursesWithLessons = await Promise.all(
           (data as Course[]).map(async (course) => {
-            const { data: reviewsData, error: reviewsError } = await supabase
-              .from('reviews')
-              .select('rating')
-              .eq('course_id', course.id);
+            const { data: lessonsData, error: lessonsError } = await supabase
+              .from('lessons')
+              .select('*')
+              .eq('course_id', course.id)
+              .order('lesson_title', { ascending: true });
             
-            if (reviewsError) {
-              console.error('Error fetching reviews:', reviewsError);
-              return { ...course, rating: 0 };
+            if (lessonsError) {
+              console.error('Error fetching lessons:', lessonsError);
+              return { ...course, lessons: [] };
             }
             
-            const ratings = reviewsData.map(r => r.rating);
-            const averageRating = ratings.length > 0
-              ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
-              : 0;
-            
-            return { ...course, rating: averageRating };
+            return { ...course, lessons: lessonsData };
           })
         );
         
-        setCourses(coursesWithRatings);
+        setCourses(coursesWithLessons);
       } catch (err: any) {
         console.error('Error fetching courses:', err);
         setError(err.message);
@@ -125,22 +130,19 @@ export function useCourse(id: string) {
         if (error) {
           throw error;
         }
-        
-        // Get average rating
-        const { data: reviewsData, error: reviewsError } = await supabase
-          .from('reviews')
-          .select('rating')
-          .eq('course_id', id);
-        
-        if (reviewsError) {
-          console.error('Error fetching reviews:', reviewsError);
-        } else {
-          const ratings = reviewsData.map(r => r.rating);
-          const averageRating = ratings.length > 0
-            ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
-            : 0;
+
+        // Get lessons for the course
+        const { data: lessonsData, error: lessonsError } = await supabase
+          .from('lessons')
+          .select('*')
+          .eq('course_id', id)
+          .order('lesson_title', { ascending: true });
           
-          setCourse({ ...data, rating: averageRating });
+        if (lessonsError) {
+          console.error('Error fetching lessons:', lessonsError);
+          setCourse({ ...data, lessons: [] });
+        } else {
+          setCourse({ ...data, lessons: lessonsData });
         }
       } catch (err: any) {
         console.error('Error fetching course:', err);

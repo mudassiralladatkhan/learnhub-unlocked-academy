@@ -4,17 +4,9 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StarRating } from '@/components/courses/StarRating';
+import { Course } from '@/hooks/useCourses';
 
-export type CourseCardProps = {
-  id: string;
-  title: string;
-  description: string;
-  instructor: string;
-  category: string;
-  difficulty: string;
-  duration: number;
-  thumbnail: string | null;
-  rating?: number;
+export type CourseCardProps = Course & {
   enrolled?: boolean;
   progress?: number;
 };
@@ -29,6 +21,7 @@ export function CourseCard({
   duration,
   thumbnail,
   rating = 0,
+  lessons = [],
   enrolled = false,
   progress = 0,
 }: CourseCardProps) {
@@ -37,11 +30,11 @@ export function CourseCard({
     ? `${description.substring(0, 100)}...` 
     : description;
 
-  const difficultyColor = {
+  const difficultyColor = difficulty ? {
     beginner: 'bg-green-100 text-green-800',
     intermediate: 'bg-yellow-100 text-yellow-800',
     advanced: 'bg-red-100 text-red-800',
-  }[difficulty.toLowerCase()] || 'bg-gray-100 text-gray-800';
+  }[difficulty.toLowerCase()] : 'bg-gray-100 text-gray-800';
 
   return (
     <Link to={`/courses/${id}`}>
@@ -60,12 +53,16 @@ export function CourseCard({
             }}
           />
           <div className="absolute top-2 right-2 flex gap-2">
-            <Badge className={difficultyColor}>
-              {difficulty}
-            </Badge>
-            <Badge variant="outline" className="bg-white/80 backdrop-blur-sm">
-              {duration} hrs
-            </Badge>
+            {difficulty && (
+              <Badge className={difficultyColor}>
+                {difficulty}
+              </Badge>
+            )}
+            {duration && (
+              <Badge variant="outline" className="bg-white/80 backdrop-blur-sm">
+                {duration} hrs
+              </Badge>
+            )}
           </div>
           {enrolled && (
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200">
@@ -75,6 +72,11 @@ export function CourseCard({
               />
             </div>
           )}
+          {lessons && lessons.length > 0 && (
+            <Badge variant="secondary" className="absolute bottom-2 left-2">
+              {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
         </div>
 
         <CardContent className="p-4">
@@ -82,10 +84,16 @@ export function CourseCard({
           <p className="text-sm text-muted-foreground mb-3">{truncatedDescription}</p>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <StarRating rating={rating} />
-              <span className="ml-2 text-sm text-muted-foreground">{rating.toFixed(1)}</span>
+              {rating > 0 && (
+                <>
+                  <StarRating rating={rating} />
+                  <span className="ml-2 text-sm text-muted-foreground">{rating.toFixed(1)}</span>
+                </>
+              )}
             </div>
-            <span className="text-sm text-muted-foreground">by {instructor}</span>
+            {instructor && (
+              <span className="text-sm text-muted-foreground">by {instructor}</span>
+            )}
           </div>
         </CardContent>
 
@@ -97,7 +105,7 @@ export function CourseCard({
             </Badge>
           ) : (
             <span className="text-sm font-medium text-brand-600 dark:text-brand-400">
-              Enroll Now →
+              View Course →
             </span>
           )}
         </CardFooter>

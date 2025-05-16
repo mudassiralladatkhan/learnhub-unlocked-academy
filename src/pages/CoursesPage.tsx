@@ -26,14 +26,22 @@ export default function CoursesPage() {
   useEffect(() => {
     if (courses.length > 0) {
       setCategories(Array.from(new Set(courses.map(course => course.category))));
-      setInstructors(Array.from(new Set(courses.map(course => course.instructor))));
+      
+      // Only extract instructors if they exist in the data
+      const courseInstructors = courses
+        .map(course => course.instructor)
+        .filter(Boolean) as string[];
+      
+      if (courseInstructors.length > 0) {
+        setInstructors(Array.from(new Set(courseInstructors)));
+      }
     }
   }, [courses]);
   
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-brand-800 dark:text-brand-100 mb-2">Explore Courses</h1>
+        <h1 className="text-3xl font-bold text-brand-800 dark:text-brand-100 mb-2">LearnHub - Explore Courses</h1>
         <p className="text-muted-foreground">
           Discover courses designed to help you achieve your goals
         </p>
