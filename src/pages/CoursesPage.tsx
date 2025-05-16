@@ -14,9 +14,9 @@ export default function CoursesPage() {
   
   const { courses, loading } = useCourses({
     search,
-    category,
-    instructor,
-    difficulty,
+    category: category === 'all' ? '' : category,
+    instructor: instructor === 'all' ? '' : instructor,
+    difficulty: difficulty === 'all' ? '' : difficulty,
   });
   
   // Extract unique categories and instructors for filters

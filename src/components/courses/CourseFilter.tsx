@@ -35,9 +35,9 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
   
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
-    category: searchParams.get('category') || '',
-    instructor: searchParams.get('instructor') || '',
-    difficulty: searchParams.get('difficulty') || '',
+    category: searchParams.get('category') || 'all',
+    instructor: searchParams.get('instructor') || 'all',
+    difficulty: searchParams.get('difficulty') || 'all',
   });
 
   // For mobile filter modal
@@ -49,9 +49,9 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
     const newSearchParams = new URLSearchParams();
     
     if (filters.search) newSearchParams.set('search', filters.search);
-    if (filters.category) newSearchParams.set('category', filters.category);
-    if (filters.instructor) newSearchParams.set('instructor', filters.instructor);
-    if (filters.difficulty) newSearchParams.set('difficulty', filters.difficulty);
+    if (filters.category !== 'all') newSearchParams.set('category', filters.category);
+    if (filters.instructor !== 'all') newSearchParams.set('instructor', filters.instructor);
+    if (filters.difficulty !== 'all') newSearchParams.set('difficulty', filters.difficulty);
     
     setSearchParams(newSearchParams);
   }, [filters, setSearchParams]);
@@ -83,9 +83,9 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
   const resetFilters = () => {
     const newFilters = {
       search: '',
-      category: '',
-      instructor: '',
-      difficulty: '',
+      category: 'all',
+      instructor: 'all',
+      difficulty: 'all',
     };
     
     if (isMobile) {
@@ -143,7 +143,7 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Categories</SelectItem>
+                      <SelectItem value="all">All Categories</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category} value={category.toLowerCase()}>
                           {category}
@@ -163,7 +163,7 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
                       <SelectValue placeholder="All Instructors" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Instructors</SelectItem>
+                      <SelectItem value="all">All Instructors</SelectItem>
                       {instructors.map((instructor) => (
                         <SelectItem key={instructor} value={instructor}>
                           {instructor}
@@ -183,7 +183,7 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
                       <SelectValue placeholder="All Levels" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Levels</SelectItem>
+                      <SelectItem value="all">All Levels</SelectItem>
                       <SelectItem value="beginner">Beginner</SelectItem>
                       <SelectItem value="intermediate">Intermediate</SelectItem>
                       <SelectItem value="advanced">Advanced</SelectItem>
@@ -218,7 +218,7 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category.toLowerCase()}>
                     {category}
@@ -238,7 +238,7 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
                 <SelectValue placeholder="All Instructors" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Instructors</SelectItem>
+                <SelectItem value="all">All Instructors</SelectItem>
                 {instructors.map((instructor) => (
                   <SelectItem key={instructor} value={instructor}>
                     {instructor}
@@ -258,7 +258,7 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
                 <SelectValue placeholder="All Levels" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Levels</SelectItem>
+                <SelectItem value="all">All Levels</SelectItem>
                 <SelectItem value="beginner">Beginner</SelectItem>
                 <SelectItem value="intermediate">Intermediate</SelectItem>
                 <SelectItem value="advanced">Advanced</SelectItem>
@@ -266,7 +266,7 @@ export function CourseFilter({ categories, instructors }: CourseFilterProps) {
             </Select>
           </div>
           
-          {(filters.category || filters.instructor || filters.difficulty || filters.search) && (
+          {(filters.category !== 'all' || filters.instructor !== 'all' || filters.difficulty !== 'all' || filters.search) && (
             <Button variant="ghost" onClick={resetFilters} className="ml-auto">
               Reset Filters
             </Button>
