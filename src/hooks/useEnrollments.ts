@@ -69,16 +69,26 @@ export function useEnrollments() {
               return { ...enrollment, progress: 0 };
             }
             
+            // Get lessons for this course
+            const { data: courseLessons, error: lessonsError } = await supabase
+              .from('lessons')
+              .select('id')
+              .eq('course_id', enrollment.course_id);
+              
+            if (lessonsError || !courseLessons) {
+              console.error('Error fetching course lessons:', lessonsError);
+              return { ...enrollment, progress: 0 };
+            }
+            
+            // Extract lesson IDs into an array
+            const lessonIds = courseLessons.map(lesson => lesson.id);
+            
             // Get completed lessons count
             const { count: completedLessons, error: completedError } = await supabase
               .from('completed_lessons')
               .select('lesson_id', { count: 'exact', head: true })
               .eq('user_id', user.id)
-              .in('lesson_id', supabase
-                .from('lessons')
-                .select('id')
-                .eq('course_id', enrollment.course_id)
-              );
+              .in('lesson_id', lessonIds);
               
             if (completedError) {
               console.error('Error fetching completed lessons:', completedError);
