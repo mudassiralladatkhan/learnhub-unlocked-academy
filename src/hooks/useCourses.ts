@@ -75,15 +75,17 @@ export function useCourses(filters?: CourseFilters) {
           );
         }
         
+        // Check if difficulty exists on the course before filtering by it
         if (filters?.difficulty && filters.difficulty !== 'all') {
           filteredData = filteredData.filter(course => 
-            course.difficulty === filters.difficulty
+            course.difficulty !== undefined && course.difficulty === filters.difficulty
           );
         }
         
+        // Check if instructor exists on the course before filtering by it
         if (filters?.instructor && filters.instructor !== 'all') {
           filteredData = filteredData.filter(course => 
-            course.instructor === filters.instructor
+            course.instructor !== undefined && course.instructor === filters.instructor
           );
         }
         
