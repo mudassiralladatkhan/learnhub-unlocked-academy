@@ -155,7 +155,7 @@ export default function MyLearningPage() {
                       difficulty={enrollment.course?.difficulty || 'beginner'}
                       duration={enrollment.course?.duration || 0}
                       thumbnail={enrollment.course?.thumbnail}
-                      created_at={enrollment.started_at} {/* Add the required created_at field */}
+                      created_at={enrollment.started_at} /* Add the required created_at field */
                       enrolled={true}
                       progress={100}
                     />
