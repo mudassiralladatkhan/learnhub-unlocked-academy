@@ -44,58 +44,69 @@ export function useCourses(filters?: CourseFilters) {
       setError(null);
       
       try {
-        // Use a simpler approach to avoid excessive type instantiation
-        // First create the base query without chaining
-        const query = supabase.from('courses');
+        // Start with the basic table reference without any operations
+        const baseQuery = supabase.from('courses');
         
-        // Prepare the select query
-        const selectQuery = query.select();
+        // Perform select operation separately 
+        let data;
+        let coursesError;
         
-        // Create a new variable for the filtered query
-        let finalQuery = selectQuery;
+        // Build query step by step without chaining
+        // First get all courses
+        const selectResult = await baseQuery.select();
         
-        // Apply filters one by one without chaining type definitions
+        if (selectResult.error) {
+          throw selectResult.error;
+        }
+        
+        // Apply filters to the data in JavaScript instead of in the query
+        let filteredData = selectResult.data;
+        
         if (filters?.search) {
-          finalQuery = finalQuery.ilike('title', `%${filters.search}%`);
+          const searchLower = filters.search.toLowerCase();
+          filteredData = filteredData.filter(course => 
+            course.title.toLowerCase().includes(searchLower)
+          );
         }
         
         if (filters?.category && filters.category !== 'all') {
-          finalQuery = finalQuery.eq('category', filters.category);
+          filteredData = filteredData.filter(course => 
+            course.category === filters.category
+          );
         }
         
         if (filters?.difficulty && filters.difficulty !== 'all') {
-          finalQuery = finalQuery.eq('difficulty', filters.difficulty);
+          filteredData = filteredData.filter(course => 
+            course.difficulty === filters.difficulty
+          );
         }
         
         if (filters?.instructor && filters.instructor !== 'all') {
-          finalQuery = finalQuery.eq('instructor', filters.instructor);
+          filteredData = filteredData.filter(course => 
+            course.instructor === filters.instructor
+          );
         }
         
-        // Apply ordering to the final query
-        const orderedQuery = finalQuery.order('created_at', { ascending: false });
+        // Sort by created_at in descending order
+        filteredData.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
         
-        // Execute the final query
-        const { data, error: coursesError } = await orderedQuery;
-        
-        if (coursesError) {
-          throw coursesError;
-        }
-
         // Get lessons for each course
         const coursesWithLessons = await Promise.all(
-          (data as Course[]).map(async (course) => {
-            const { data: lessonsData, error: lessonsError } = await supabase
-              .from('lessons')
+          filteredData.map(async (course) => {
+            const lessonsQuery = supabase.from('lessons');
+            const lessonsResult = await lessonsQuery
               .select()
               .eq('course_id', course.id)
               .order('lesson_title', { ascending: true });
             
-            if (lessonsError) {
-              console.error('Error fetching lessons:', lessonsError);
+            if (lessonsResult.error) {
+              console.error('Error fetching lessons:', lessonsResult.error);
               return { ...course, lessons: [] };
             }
             
-            return { ...course, lessons: lessonsData };
+            return { ...course, lessons: lessonsResult.data };
           })
         );
         
@@ -131,32 +142,31 @@ export function useCourse(id: string) {
       setError(null);
       
       try {
-        // Use a simpler approach without complex type chaining
+        // Split the query into separate operations
         const courseQuery = supabase.from('courses');
-        const selectQuery = courseQuery.select();
-        const filteredQuery = selectQuery.eq('id', id);
         
-        // Execute the query
-        const { data, error: courseError } = await filteredQuery.single();
+        // Get the specific course by ID
+        const courseResult = await courseQuery
+          .select()
+          .eq('id', id)
+          .single();
         
-        if (courseError) {
-          throw courseError;
+        if (courseResult.error) {
+          throw courseResult.error;
         }
-
-        // Get lessons using a similar approach
+        
+        // Get lessons for this course
         const lessonsQuery = supabase.from('lessons');
-        const lessonsSelectQuery = lessonsQuery.select();
-        const lessonsFilteredQuery = lessonsSelectQuery
+        const lessonsResult = await lessonsQuery
+          .select()
           .eq('course_id', id)
           .order('lesson_title', { ascending: true });
         
-        const { data: lessonsData, error: lessonsError } = await lessonsFilteredQuery;
-          
-        if (lessonsError) {
-          console.error('Error fetching lessons:', lessonsError);
-          setCourse({ ...data, lessons: [] });
+        if (lessonsResult.error) {
+          console.error('Error fetching lessons:', lessonsResult.error);
+          setCourse({ ...courseResult.data, lessons: [] });
         } else {
-          setCourse({ ...data, lessons: lessonsData });
+          setCourse({ ...courseResult.data, lessons: lessonsResult.data });
         }
       } catch (err: any) {
         console.error('Error fetching course:', err);
