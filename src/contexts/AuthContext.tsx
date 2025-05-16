@@ -182,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: "You've successfully signed in",
         });
         
+        // Make sure to use navigate here
         navigate('/dashboard');
       }
     } catch (error: any) {
