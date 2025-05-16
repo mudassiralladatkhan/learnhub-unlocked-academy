@@ -60,7 +60,7 @@ export function useCourses(filters?: CourseFilters) {
         }
         
         // Apply filters to the data in JavaScript instead of in the query
-        let filteredData = selectResult.data;
+        let filteredData = selectResult.data as unknown as Course[];
         
         if (filters?.search) {
           const searchLower = filters.search.toLowerCase();
@@ -157,6 +157,9 @@ export function useCourse(id: string) {
           throw courseResult.error;
         }
         
+        // Cast the data to our Course type with optional properties
+        const courseData = courseResult.data as unknown as Course;
+        
         // Get lessons for this course
         const lessonsQuery = supabase.from('lessons');
         const lessonsResult = await lessonsQuery
@@ -166,9 +169,9 @@ export function useCourse(id: string) {
         
         if (lessonsResult.error) {
           console.error('Error fetching lessons:', lessonsResult.error);
-          setCourse({ ...courseResult.data, lessons: [] });
+          setCourse({ ...courseData, lessons: [] });
         } else {
-          setCourse({ ...courseResult.data, lessons: lessonsResult.data });
+          setCourse({ ...courseData, lessons: lessonsResult.data });
         }
       } catch (err: any) {
         console.error('Error fetching course:', err);
