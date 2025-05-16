@@ -44,31 +44,31 @@ export function useCourses(filters?: CourseFilters) {
       setError(null);
       
       try {
-        // Fetch all courses first
-        const query = supabase.from('courses');
+        // Create a base query without filters
+        let queryBuilder = supabase.from('courses').select();
         
-        // Apply search filter if provided
-        let filteredQuery = query.select();
-        
-        // Apply filters separately to avoid deep type instantiation
+        // Apply filters one by one
         if (filters?.search) {
-          filteredQuery = filteredQuery.ilike('title', `%${filters.search}%`);
+          queryBuilder = queryBuilder.ilike('title', `%${filters.search}%`);
         }
         
         if (filters?.category && filters.category !== 'all') {
-          filteredQuery = filteredQuery.eq('category', filters.category);
+          queryBuilder = queryBuilder.eq('category', filters.category);
         }
         
         if (filters?.difficulty && filters.difficulty !== 'all') {
-          filteredQuery = filteredQuery.eq('difficulty', filters.difficulty);
+          queryBuilder = queryBuilder.eq('difficulty', filters.difficulty);
         }
         
         if (filters?.instructor && filters.instructor !== 'all') {
-          filteredQuery = filteredQuery.eq('instructor', filters.instructor);
+          queryBuilder = queryBuilder.eq('instructor', filters.instructor);
         }
         
-        // Execute the query with ordering
-        const { data, error: coursesError } = await filteredQuery.order('created_at', { ascending: false });
+        // Apply ordering
+        queryBuilder = queryBuilder.order('created_at', { ascending: false });
+        
+        // Execute the final query
+        const { data, error: coursesError } = await queryBuilder;
         
         if (coursesError) {
           throw coursesError;
