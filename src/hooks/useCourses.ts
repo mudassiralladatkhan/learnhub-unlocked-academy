@@ -44,31 +44,38 @@ export function useCourses(filters?: CourseFilters) {
       setError(null);
       
       try {
-        // Create a base query without filters
-        let queryBuilder = supabase.from('courses').select();
+        // Use a simpler approach to avoid excessive type instantiation
+        // First create the base query without chaining
+        const query = supabase.from('courses');
         
-        // Apply filters one by one
+        // Prepare the select query
+        const selectQuery = query.select();
+        
+        // Create a new variable for the filtered query
+        let finalQuery = selectQuery;
+        
+        // Apply filters one by one without chaining type definitions
         if (filters?.search) {
-          queryBuilder = queryBuilder.ilike('title', `%${filters.search}%`);
+          finalQuery = finalQuery.ilike('title', `%${filters.search}%`);
         }
         
         if (filters?.category && filters.category !== 'all') {
-          queryBuilder = queryBuilder.eq('category', filters.category);
+          finalQuery = finalQuery.eq('category', filters.category);
         }
         
         if (filters?.difficulty && filters.difficulty !== 'all') {
-          queryBuilder = queryBuilder.eq('difficulty', filters.difficulty);
+          finalQuery = finalQuery.eq('difficulty', filters.difficulty);
         }
         
         if (filters?.instructor && filters.instructor !== 'all') {
-          queryBuilder = queryBuilder.eq('instructor', filters.instructor);
+          finalQuery = finalQuery.eq('instructor', filters.instructor);
         }
         
-        // Apply ordering
-        queryBuilder = queryBuilder.order('created_at', { ascending: false });
+        // Apply ordering to the final query
+        const orderedQuery = finalQuery.order('created_at', { ascending: false });
         
         // Execute the final query
-        const { data, error: coursesError } = await queryBuilder;
+        const { data, error: coursesError } = await orderedQuery;
         
         if (coursesError) {
           throw coursesError;
@@ -124,22 +131,26 @@ export function useCourse(id: string) {
       setError(null);
       
       try {
-        const { data, error: courseError } = await supabase
-          .from('courses')
-          .select()
-          .eq('id', id)
-          .single();
+        // Use a simpler approach without complex type chaining
+        const courseQuery = supabase.from('courses');
+        const selectQuery = courseQuery.select();
+        const filteredQuery = selectQuery.eq('id', id);
+        
+        // Execute the query
+        const { data, error: courseError } = await filteredQuery.single();
         
         if (courseError) {
           throw courseError;
         }
 
-        // Get lessons for the course
-        const { data: lessonsData, error: lessonsError } = await supabase
-          .from('lessons')
-          .select()
+        // Get lessons using a similar approach
+        const lessonsQuery = supabase.from('lessons');
+        const lessonsSelectQuery = lessonsQuery.select();
+        const lessonsFilteredQuery = lessonsSelectQuery
           .eq('course_id', id)
           .order('lesson_title', { ascending: true });
+        
+        const { data: lessonsData, error: lessonsError } = await lessonsFilteredQuery;
           
         if (lessonsError) {
           console.error('Error fetching lessons:', lessonsError);
