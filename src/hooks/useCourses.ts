@@ -8,7 +8,7 @@ export type Course = {
   title: string;
   description: string;
   instructor?: string;
-  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  difficulty?: 'beginner' | 'intermediate' | 'advanced' | string;
   category: string;
   duration?: number;
   thumbnail?: string | null;
@@ -65,10 +65,10 @@ export function useCourses(filters?: CourseFilters) {
           }
         }
         
-        const { data, error } = await query.order('created_at', { ascending: false });
+        const { data, error: coursesError } = await query.order('created_at', { ascending: false });
         
-        if (error) {
-          throw error;
+        if (coursesError) {
+          throw coursesError;
         }
 
         // Get lessons for each course
@@ -121,14 +121,14 @@ export function useCourse(id: string) {
       setError(null);
       
       try {
-        const { data, error } = await supabase
+        const { data, error: courseError } = await supabase
           .from('courses')
           .select('*')
           .eq('id', id)
           .single();
         
-        if (error) {
-          throw error;
+        if (courseError) {
+          throw courseError;
         }
 
         // Get lessons for the course

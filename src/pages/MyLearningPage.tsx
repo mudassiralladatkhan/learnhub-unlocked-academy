@@ -152,7 +152,7 @@ export default function MyLearningPage() {
                       description={enrollment.course?.description || ''}
                       instructor={enrollment.course?.instructor || ''}
                       category={enrollment.course?.category || ''}
-                      difficulty={enrollment.course?.difficulty || ''}
+                      difficulty={enrollment.course?.difficulty || 'beginner'}
                       duration={enrollment.course?.duration || 0}
                       thumbnail={enrollment.course?.thumbnail}
                       enrolled={true}
