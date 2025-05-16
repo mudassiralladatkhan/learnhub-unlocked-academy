@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
 export type Course = {
   id: string;
@@ -45,7 +44,7 @@ export function useCourses(filters?: CourseFilters) {
       setError(null);
       
       try {
-        // Start a query for courses
+        // Start building the query
         let query = supabase.from('courses').select();
         
         // Apply filters if provided
@@ -67,7 +66,7 @@ export function useCourses(filters?: CourseFilters) {
           }
         }
         
-        // Order by created_at and execute the query
+        // Execute the query with ordering
         const { data, error: coursesError } = await query.order('created_at', { ascending: false });
         
         if (coursesError) {
