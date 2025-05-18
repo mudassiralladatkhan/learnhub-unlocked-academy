@@ -1,0 +1,70 @@
+/* Lightweight mode styles 
+   These styles override default styles when running in lightweight mode 
+   to improve performance on lower-end devices
+*/
+
+.lightweight-mode * {
+  /* Disable animations and transitions for better performance */
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Simplified shadows */
+.lightweight-mode .shadow,
+.lightweight-mode .shadow-sm,
+.lightweight-mode .shadow-md,
+.lightweight-mode .shadow-lg,
+.lightweight-mode .shadow-xl {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Reduce border-radius complexity */
+.lightweight-mode [class*="rounded"] {
+  border-radius: 4px !important;
+}
+
+/* Simplify gradients */
+.lightweight-mode [class*="bg-gradient"] {
+  background: none !important;
+}
+
+/* Optimize fixed and sticky positioning */
+.lightweight-mode .fixed,
+.lightweight-mode .sticky {
+  position: relative !important;
+}
+
+/* Reduce backdrop blur effects */
+.lightweight-mode .backdrop-blur,
+.lightweight-mode [class*="backdrop-blur-"] {
+  backdrop-filter: none !important;
+}
+
+/* Simplify transforms */
+.lightweight-mode [style*="transform"] {
+  transform: none !important;
+}
+
+/* Optimize images */
+.lightweight-mode img {
+  image-rendering: auto !important;
+}
+
+/* Disable parallax effects */
+.lightweight-mode [class*="parallax"] {
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Reduce opacity transitions */
+.lightweight-mode [class*="opacity"] {
+  transition: none !important;
+}
+
+/* Disable non-essential motion animations */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

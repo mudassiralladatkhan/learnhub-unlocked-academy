@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +13,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSession } from '@/contexts/SessionContext';
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -27,9 +27,28 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { signIn } = useAuth();
+  const { signIn, user, session, loading } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Redirect to dashboard after login but with improved handling
+  useEffect(() => {
+    // Don't redirect if still loading auth state
+    if (loading) return;
+    
+    if (user || session) {
+      console.log("User authenticated, redirecting to dashboard...");
+      
+      // Get redirect path and clean up storage
+      const redirectToPath = sessionStorage.getItem('redirectAfterLogin') || '/dashboard';
+      sessionStorage.removeItem('redirectAfterLogin');
+      
+      // Use a single navigation approach with replace to avoid history issues
+      // This will prevent the user from going back to the login page after login
+      navigate(redirectToPath, { replace: true });
+    }
+  }, [user, session, loading, navigate]);
   
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -39,13 +58,22 @@ export default function LoginPage() {
     },
   });
   
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   async function onSubmit(data: LoginFormValues) {
     setIsSubmitting(true);
+    setLoginError(null);
+    
     try {
+      // Attempt to sign in
       await signIn(data.email, data.password);
-      // The navigation is now handled in AuthContext
-    } catch (error) {
+      console.log("Login successful");
+      
+      // The useEffect hook will handle redirection once user/session state updates
+      // No need to navigate here to avoid race conditions
+    } catch (error: any) {
       console.error("Login error:", error);
+      setLoginError(error.message || 'Invalid email or password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -97,6 +125,13 @@ export default function LoginPage() {
               </Link>
             </div>
             
+            {/* Display login error if any */}
+            {loginError && (
+              <div className="p-3 my-2 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-red-900/50 dark:text-red-200">
+                {loginError}
+              </div>
+            )}
+
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>

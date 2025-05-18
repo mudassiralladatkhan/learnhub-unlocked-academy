@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSession } from '@/contexts/SessionContext';
 
 const profileSchema = z.object({
   name: z.string().min(2, {
@@ -61,7 +61,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 export default function ProfilePage() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const profileForm = useForm<ProfileFormValues>({

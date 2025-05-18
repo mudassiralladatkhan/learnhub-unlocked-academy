@@ -10,21 +10,29 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSession } from '@/contexts/SessionContext';
 import { useToast } from '@/hooks/use-toast';
+import { VideoPlayer } from '@/components/player/VideoPlayer';
+import { useEnrollmentSimple } from '@/hooks/useEnrollmentSimple';
 
 type Lesson = {
   id: string;
   course_id: string;
-  title: string;
-  content: string;
-  video_url: string | null;
-  order: number;
+  title?: string;
+  lesson_title?: string; // Support for both title formats
+  content?: string;
+  video_url?: string | null;
+  order?: number;
+  created_at?: string;
 };
+
+// Storage key for local enrollments data
+const ENROLLMENTS_STORAGE_KEY = 'learnhub-enrollments';
+const COURSES_STORAGE_KEY = 'learnhub-courses';
 
 export default function LessonPage() {
   const { courseId, lessonId } = useParams<{ courseId: string, lessonId: string }>();
-  const { user } = useAuth();
+  const { user } = useSession();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -35,6 +43,10 @@ export default function LessonPage() {
   const [loading, setLoading] = useState(true);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [videoProgress, setVideoProgress] = useState(0);
+  
+  // Use our enrollment hook instead of direct database calls
+  const { isEnrolled, updateCourseProgress } = useEnrollmentSimple();
   
   useEffect(() => {
     if (!user) {
@@ -49,14 +61,10 @@ export default function LessonPage() {
     
     const checkEnrollment = async () => {
       try {
-        const { data, error } = await supabase
-          .from('enrollments')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('course_id', courseId)
-          .single();
+        // Check enrollment from localStorage
+        const enrolled = await isEnrolled(courseId || '');
         
-        if (error || !data) {
+        if (!enrolled) {
           toast({
             title: "Access denied",
             description: "You are not enrolled in this course",
@@ -71,7 +79,7 @@ export default function LessonPage() {
     };
     
     checkEnrollment();
-  }, [user, courseId, navigate, toast]);
+  }, [user, courseId, navigate, toast, isEnrolled]);
   
   useEffect(() => {
     const fetchLesson = async () => {
@@ -79,70 +87,89 @@ export default function LessonPage() {
       
       setLoading(true);
       try {
-        // Get course info
-        const { data: courseData, error: courseError } = await supabase
-          .from('courses')
-          .select('title, id')
-          .eq('id', courseId)
-          .single();
+        // Get course info from localStorage
+        const storedCourses = localStorage.getItem(COURSES_STORAGE_KEY);
+        let courseData = null;
         
-        if (courseError) throw courseError;
-        setCourse(courseData);
-        
-        // Get current lesson
-        const { data: lessonData, error: lessonError } = await supabase
-          .from('lessons')
-          .select('*')
-          .eq('id', lessonId)
-          .eq('course_id', courseId)
-          .single();
-        
-        if (lessonError) throw lessonError;
-        setLesson(lessonData);
-        
-        // Get all lessons for this course
-        const { data: allLessonsData, error: allLessonsError } = await supabase
-          .from('lessons')
-          .select('*')
-          .eq('course_id', courseId)
-          .order('order', { ascending: true });
-        
-        if (allLessonsError) throw allLessonsError;
-        setAllLessons(allLessonsData);
-        
-        // Check if this lesson is completed
-        const { data: completedData, error: completedError } = await supabase
-          .from('completed_lessons')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('lesson_id', lessonId)
-          .single();
-        
-        if (completedError && completedError.code !== 'PGRST116') {
-          throw completedError;
+        if (storedCourses) {
+          const courses = JSON.parse(storedCourses);
+          courseData = courses.find((c: any) => c.id === courseId);
+          if (courseData) {
+            setCourse({
+              id: courseData.id,
+              title: courseData.title
+            });
+            
+            // Find the current lesson from the course's lessons
+            if (courseData.lessons && courseData.lessons.length > 0) {
+              const lessonData = courseData.lessons.find((l: any) => l.id === lessonId);
+              if (lessonData) {
+                // Normalize lesson data
+                setLesson({
+                  id: lessonData.id,
+                  course_id: courseId || '',
+                  title: lessonData.title || lessonData.lesson_title,
+                  content: lessonData.content || `<h1>${lessonData.title || lessonData.lesson_title}</h1><p>Lesson content</p>`,
+                  video_url: lessonData.video_url,
+                  order: lessonData.order || courseData.lessons.indexOf(lessonData)
+                });
+                
+                // Set all lessons
+                setAllLessons(courseData.lessons.map((l: any) => ({
+                  id: l.id,
+                  course_id: courseId || '',
+                  title: l.title || l.lesson_title,
+                  order: l.order || courseData.lessons.indexOf(l)
+                })));
+                
+                // Try to fetch from database only if not found in localStorage
+                return;
+              }
+            }
+          }
         }
         
-        setIsCompleted(Boolean(completedData));
-        
-        // Calculate overall progress
-        const { count: completedCount, error: countError } = await supabase
-          .from('completed_lessons')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .in('lesson_id', allLessonsData.map(l => l.id));
+        // If we couldn't get from localStorage, try database
+        try {
+          // Get course info
+          const { data: dbCourseData, error: courseError } = await supabase
+            .from('courses')
+            .select('title, id')
+            .eq('id', courseId)
+            .single();
           
-        if (!countError && completedCount !== null && allLessonsData.length > 0) {
-          setProgress(Math.round((completedCount / allLessonsData.length) * 100));
+          if (courseError) throw courseError;
+          setCourse(dbCourseData);
+          
+          // Get current lesson
+          const { data: lessonData, error: lessonError } = await supabase
+            .from('lessons')
+            .select('*')
+            .eq('id', lessonId)
+            .eq('course_id', courseId)
+            .single();
+          
+          if (lessonError) throw lessonError;
+          setLesson(lessonData);
+          
+          // Get all lessons for this course
+          const { data: allLessonsData, error: allLessonsError } = await supabase
+            .from('lessons')
+            .select('*')
+            .eq('course_id', courseId)
+            .order('order', { ascending: true });
+          
+          if (allLessonsError) throw allLessonsError;
+          setAllLessons(allLessonsData);
+        } catch (err: any) {
+          console.error('Error fetching lesson from database:', err);
+          toast({
+            title: "Error",
+            description: err.message || "Failed to load lesson",
+            variant: "destructive",
+          });
+          navigate(`/courses/${courseId}`);
         }
-        
-        // Update enrollment status to in_progress if it's not already
-        await supabase
-          .from('enrollments')
-          .update({ status: 'in_progress' })
-          .eq('user_id', user.id)
-          .eq('course_id', courseId)
-          .neq('status', 'completed');
-          
       } catch (err: any) {
         console.error('Error fetching lesson:', err);
         toast({
@@ -159,83 +186,80 @@ export default function LessonPage() {
     fetchLesson();
   }, [courseId, lessonId, user, navigate, toast]);
   
-  const markAsComplete = async () => {
-    if (!user || !lesson) return;
+  useEffect(() => {
+    const checkCompletionStatus = async () => {
+      if (!user || !courseId || !lessonId) return;
+      
+      try {
+        // Get enrollments from localStorage
+        const storedData = localStorage.getItem(ENROLLMENTS_STORAGE_KEY);
+        if (!storedData) return;
+        
+        const enrollments = JSON.parse(storedData);
+        const userEnrollment = enrollments.find(
+          (e: any) => e.user_id === user.id && e.course_id === courseId
+        );
+        
+        if (!userEnrollment) return;
+        
+        // Check if this lesson is in completed lessons
+        const completedLessons = userEnrollment.completed_lessons || [];
+        setIsCompleted(completedLessons.includes(lessonId));
+        
+        // Set progress from the enrollment
+        if (userEnrollment.progress !== undefined) {
+          setProgress(userEnrollment.progress);
+        } else if (allLessons.length > 0 && completedLessons.length > 0) {
+          // Calculate if not available
+          setProgress(Math.floor((completedLessons.length / allLessons.length) * 100));
+        }
+      } catch (error) {
+        console.error('Error checking completion status from localStorage:', error);
+      }
+    };
     
-    setMarkingComplete(true);
+    if (allLessons.length > 0) {
+      checkCompletionStatus();
+    }
+  }, [user, courseId, lessonId, allLessons]);
+  
+  const markLessonAsCompleted = async () => {
+    if (!user || !courseId || !lessonId) return;
+    
     try {
-      if (isCompleted) {
-        // Remove completion record
-        const { error } = await supabase
-          .from('completed_lessons')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('lesson_id', lesson.id);
-          
-        if (error) throw error;
-        
-        setIsCompleted(false);
-        setProgress(prev => {
-          const newProgress = Math.max(0, prev - (1 / allLessons.length) * 100);
-          return Math.round(newProgress);
-        });
-        
-        toast({
-          title: "Lesson unmarked",
-          description: "Lesson marked as incomplete",
-        });
-      } else {
-        // Add completion record
-        const { error } = await supabase
-          .from('completed_lessons')
-          .insert({
-            user_id: user.id,
-            lesson_id: lesson.id,
-            completed_at: new Date().toISOString(),
-          });
-          
-        if (error) throw error;
-        
+      setMarkingComplete(true);
+      
+      // Use the hook's updateCourseProgress function to mark as complete
+      const success = await updateCourseProgress(courseId, lessonId);
+      
+      if (success) {
+        // Update local state
         setIsCompleted(true);
         
-        // Calculate new progress
-        const newProgress = ((allLessons.filter(l => 
-          l.id === lesson.id || 
-          allLessons.indexOf(l) < allLessons.findIndex(l => l.id === lesson.id)
-        ).length) / allLessons.length) * 100;
-        
-        setProgress(Math.round(newProgress));
-        
-        // Check if all lessons are completed
-        const allCompleted = newProgress >= 100;
-        
-        if (allCompleted) {
-          // Update enrollment status to completed
-          await supabase
-            .from('enrollments')
-            .update({ 
-              status: 'completed',
-              completed_at: new Date().toISOString() 
-            })
-            .eq('user_id', user.id)
-            .eq('course_id', courseId);
-            
-          toast({
-            title: "Congratulations! 🎉",
-            description: "You've completed the entire course!",
-          });
-        } else {
-          toast({
-            title: "Progress saved",
-            description: "Lesson marked as complete",
-          });
+        // Get updated progress from localStorage
+        const storedData = localStorage.getItem(ENROLLMENTS_STORAGE_KEY);
+        if (storedData) {
+          const enrollments = JSON.parse(storedData);
+          const enrollment = enrollments.find(
+            (e: any) => e.user_id === user.id && e.course_id === courseId
+          );
+          
+          if (enrollment && enrollment.progress !== undefined) {
+            setProgress(enrollment.progress);
+          }
         }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to mark lesson as complete",
+          variant: "destructive",
+        });
       }
-    } catch (err: any) {
-      console.error('Error updating lesson status:', err);
+    } catch (error) {
+      console.error('Error marking lesson as complete:', error);
       toast({
         title: "Error",
-        description: err.message || "Failed to update lesson status",
+        description: "Failed to mark lesson as complete",
         variant: "destructive",
       });
     } finally {
@@ -334,15 +358,22 @@ export default function LessonPage() {
               </h2>
               
               {lesson.video_url && (
-                <div className="aspect-video bg-muted rounded-lg mb-6 flex items-center justify-center">
-                  <div className="text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4 text-muted-foreground">
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
-                    <p className="text-muted-foreground">
-                      Video player would be displayed here
-                    </p>
-                  </div>
+                <div className="mb-6">
+                  <VideoPlayer 
+                    src={lesson.video_url} 
+                    title={lesson.title}
+                    onProgress={(progress) => {
+                      // Automatically mark as complete when 90% of the video is watched
+                      if (progress >= 90 && !isCompleted) {
+                        markLessonAsCompleted();
+                      }
+                    }}
+                    onComplete={() => {
+                      if (!isCompleted) {
+                        markLessonAsCompleted();
+                      }
+                    }}
+                  />
                 </div>
               )}
               
@@ -355,7 +386,7 @@ export default function LessonPage() {
               <div className="mt-8 flex items-center justify-between pt-6 border-t border-border">
                 <Button
                   variant={isCompleted ? "outline" : "default"}
-                  onClick={markAsComplete}
+                  onClick={markLessonAsCompleted}
                   disabled={markingComplete}
                   className="flex items-center"
                 >

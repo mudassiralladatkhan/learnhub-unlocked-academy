@@ -14,7 +14,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSession } from '@/contexts/SessionContext';
+import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 
 const registerSchema = z.object({
   name: z.string().min(2, {
@@ -35,8 +36,14 @@ const registerSchema = z.object({
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
-  const { signUp } = useAuth();
+  const { signUp } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Redirect already authenticated users away from register page
+  useAuthRedirect({
+    redirectAuthenticated: true,
+    redirectAuthenticatedTo: '/dashboard'
+  });
   
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),

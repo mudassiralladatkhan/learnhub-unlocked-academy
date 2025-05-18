@@ -1,8 +1,12 @@
-
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSession } from '@/contexts/SessionContext';
+
+/**
+ * NOTE: This file has been replaced by useEnrollmentSimple.ts and useEnrollmentsList.ts
+ * This file remains for compatibility but new features should use the new hooks
+ */
 
 export type Enrollment = {
   id: string;
@@ -27,7 +31,7 @@ export function useEnrollments() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user } = useSession();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -42,64 +46,55 @@ export function useEnrollments() {
       setError(null);
       
       try {
-        const { data, error } = await supabase
+        // Use type assertion to make TypeScript happy
+        const result = await (supabase as any)
           .from('enrollments')
           .select(`
             *,
-            course:courses(title, thumbnail, description, instructor, difficulty, category, duration)
+            course:courses(*)
           `)
           .eq('user_id', user.id)
           .order('started_at', { ascending: false });
         
-        if (error) {
-          throw error;
-        }
+        if (result.error) throw result.error;
         
-        // Calculate progress for each enrollment
+        // Process the data to calculate progress
         const enrollmentsWithProgress = await Promise.all(
-          data.map(async (enrollment) => {
-            // Get total lesson count for the course
-            const { count: totalLessons, error: lessonCountError } = await supabase
-              .from('lessons')
-              .select('id', { count: 'exact', head: true })
-              .eq('course_id', enrollment.course_id);
+          result.data.map(async (enrollment: any) => {
+            // Default progress
+            let progress = 0;
+            
+            try {
+              // Get total lesson count for the course
+              const lessonCount = await (supabase as any)
+                .from('lessons')
+                .select('id', { count: 'exact', head: true })
+                .eq('course_id', enrollment.course_id);
               
-            if (lessonCountError) {
-              console.error('Error fetching lesson count:', lessonCountError);
-              return { ...enrollment, progress: 0 };
+              const totalLessons = lessonCount.count || 0;
+              
+              if (totalLessons > 0) {
+                // Get completed lessons
+                const completedCount = await (supabase as any)
+                  .from('completed_lessons')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('user_id', user.id)
+                  .eq('course_id', enrollment.course_id);
+                  
+                const completedLessons = completedCount.count || 0;
+                
+                // Calculate progress percentage
+                progress = Math.round((completedLessons / totalLessons) * 100);
+              }
+              
+            } catch (err) {
+              console.error('Error calculating progress:', err);
             }
             
-            // Get lessons for this course
-            const { data: courseLessons, error: lessonsError } = await supabase
-              .from('lessons')
-              .select('id')
-              .eq('course_id', enrollment.course_id);
-              
-            if (lessonsError || !courseLessons) {
-              console.error('Error fetching course lessons:', lessonsError);
-              return { ...enrollment, progress: 0 };
-            }
-            
-            // Extract lesson IDs into an array
-            const lessonIds = courseLessons.map(lesson => lesson.id);
-            
-            // Get completed lessons count
-            const { count: completedLessons, error: completedError } = await supabase
-              .from('completed_lessons')
-              .select('lesson_id', { count: 'exact', head: true })
-              .eq('user_id', user.id)
-              .in('lesson_id', lessonIds);
-              
-            if (completedError) {
-              console.error('Error fetching completed lessons:', completedError);
-              return { ...enrollment, progress: 0 };
-            }
-            
-            const progress = totalLessons && totalLessons > 0
-              ? Math.round((completedLessons / totalLessons) * 100)
-              : 0;
-              
-            return { ...enrollment, progress };
+            return { 
+              ...enrollment,
+              progress 
+            };
           })
         );
         
@@ -109,7 +104,7 @@ export function useEnrollments() {
         setError(err.message);
         toast({
           title: "Error",
-          description: "Failed to load enrollments. Please try again later.",
+          description: "Failed to load your enrollments. Please try again later.",
           variant: "destructive",
         });
       } finally {
@@ -132,23 +127,23 @@ export function useEnrollments() {
     
     try {
       // Check if user is already enrolled
-      const { data: existingEnrollment, error: checkError } = await supabase
+      const checkResult = await (supabase as any)
         .from('enrollments')
         .select('id')
         .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
       
-      if (existingEnrollment) {
+      if (checkResult.data) {
         toast({
           title: "Already enrolled",
           description: "You are already enrolled in this course",
         });
-        return { success: true, enrollment: existingEnrollment };
+        return { success: true, enrollment: checkResult.data };
       }
       
       // Create enrollment
-      const { data, error } = await supabase
+      const enrollResult = await (supabase as any)
         .from('enrollments')
         .insert({
           user_id: user.id,
@@ -159,16 +154,14 @@ export function useEnrollments() {
         .select()
         .single();
       
-      if (error) {
-        throw error;
-      }
+      if (enrollResult.error) throw enrollResult.error;
       
       toast({
         title: "Enrollment successful",
         description: "You have successfully enrolled in the course",
       });
       
-      return { success: true, enrollment: data };
+      return { success: true, enrollment: enrollResult.data };
     } catch (err: any) {
       console.error('Error enrolling in course:', err);
       toast({
@@ -181,22 +174,20 @@ export function useEnrollments() {
     }
   };
   
-  const isEnrolled = async (courseId: string) => {
+  const isEnrolled = async (courseId: string): Promise<boolean> => {
     if (!user) return false;
     
     try {
-      const { data, error } = await supabase
+      const result = await (supabase as any)
         .from('enrollments')
         .select('id')
         .eq('user_id', user.id)
         .eq('course_id', courseId)
-        .single();
+        .maybeSingle();
       
-      if (error) {
-        return false;
-      }
+      if (result.error) throw result.error;
       
-      return Boolean(data);
+      return !!result.data;
     } catch (err) {
       return false;
     }

@@ -2,15 +2,65 @@ import { Tab } from '@headlessui/react';
 import { CourseCard } from '@/components/courses/CourseCard';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { useEnrollments } from '@/hooks/useEnrollments';
+import { useEnrollmentsList, EnrollmentWithCourse } from '@/hooks/useEnrollmentsList';
 import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { AlertCircle, Trash2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+
+/**
+ * Course status badge component
+ */
+const StatusBadge = ({ status }: { status: 'enrolled' | 'in_progress' | 'completed' }) => {
+  const statusConfig = {
+    enrolled: { label: 'Not Started', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
+    in_progress: { label: 'In Progress', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+    completed: { label: 'Completed', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+  };
+  
+  const config = statusConfig[status];
+  
+  return (
+    <span className={`text-xs font-medium mr-2 px-2.5 py-0.5 rounded ${config.color}`}>
+      {config.label}
+    </span>
+  );
+};
 
 export default function MyLearningPage() {
-  const { enrollments, loading } = useEnrollments();
+  const { enrollments, loading, error, removeEnrollment } = useEnrollmentsList();
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [filteredEnrollments, setFilteredEnrollments] = useState<{
+    notStarted: EnrollmentWithCourse[];
+    inProgress: EnrollmentWithCourse[];
+    completed: EnrollmentWithCourse[];
+  }>({ notStarted: [], inProgress: [], completed: [] });
   
-  // Categorize enrollments by status
-  const inProgress = enrollments.filter(enrollment => enrollment.status === 'in_progress' || enrollment.status === 'enrolled');
-  const completed = enrollments.filter(enrollment => enrollment.status === 'completed');
+  // Process and categorize enrollments when they change
+  useEffect(() => {
+    if (enrollments) {
+      setFilteredEnrollments({
+        notStarted: enrollments.filter(e => e.status === 'enrolled' && (!e.progress || e.progress === 0)),
+        inProgress: enrollments.filter(e => e.status === 'in_progress' || (e.status === 'enrolled' && e.progress && e.progress > 0)),
+        completed: enrollments.filter(e => e.status === 'completed')
+      });
+    }
+  }, [enrollments]);
+  
+  // Show all active courses (not started + in progress)
+  const activeCourses = [...filteredEnrollments.notStarted, ...filteredEnrollments.inProgress];
   
   return (
     <div className="container mx-auto px-4 py-8">
@@ -18,6 +68,16 @@ export default function MyLearningPage() {
       <p className="text-muted-foreground mb-8">
         Track and manage your enrolled courses
       </p>
+      
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            {error} - Please try refreshing the page.
+          </AlertDescription>
+        </Alert>
+      )}
       
       {loading ? (
         <div className="space-y-8">
@@ -44,7 +104,7 @@ export default function MyLearningPage() {
           </Button>
         </div>
       ) : (
-        <Tab.Group>
+        <Tab.Group selectedIndex={selectedTab} onChange={setSelectedTab}>
           <Tab.List className="flex space-x-1 p-1 bg-muted rounded-lg mb-8">
             <Tab
               className={({ selected }) =>
@@ -56,7 +116,7 @@ export default function MyLearningPage() {
                  }`
               }
             >
-              In Progress ({inProgress.length})
+              Active Courses ({activeCourses.length})
             </Tab>
             <Tab
               className={({ selected }) =>
@@ -68,23 +128,23 @@ export default function MyLearningPage() {
                  }`
               }
             >
-              Completed ({completed.length})
+              Completed ({filteredEnrollments.completed.length})
             </Tab>
           </Tab.List>
           
           <Tab.Panels>
             <Tab.Panel>
-              {/* Panel for In Progress courses */}
-              {inProgress.length === 0 ? (
+              {/* Panel for Active courses (Not Started + In Progress) */}
+              {activeCourses.length === 0 ? (
                 <div className="text-center py-12 bg-white dark:bg-brand-900/40 rounded-lg shadow-sm border border-border">
-                  <h3 className="text-xl font-medium mb-2">No courses in progress</h3>
+                  <h3 className="text-xl font-medium mb-2">No active courses</h3>
                   <p className="text-muted-foreground">
-                    You don't have any courses in progress
+                    You don't have any active courses
                   </p>
                 </div>
               ) : (
                 <div className="space-y-8">
-                  {inProgress.map(enrollment => (
+                  {activeCourses.map(enrollment => (
                     <div key={enrollment.id} className="bg-white dark:bg-brand-900/40 rounded-lg shadow-sm border border-border overflow-hidden">
                       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4">
                         <div className="md:col-span-1">
@@ -107,17 +167,48 @@ export default function MyLearningPage() {
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                             <div className="space-y-2 flex-1">
                               <div className="flex justify-between text-sm">
-                                <span>Progress</span>
-                                <span>{enrollment.progress || 0}%</span>
+                                <div className="flex items-center">
+                                  <StatusBadge status={enrollment.status} />
+                                  <span>Progress</span>
+                                </div>
+                                <span>{enrollment.progress}%</span>
                               </div>
-                              <Progress value={enrollment.progress || 0} className="h-2" />
+                              <Progress value={enrollment.progress} className="h-2" />
+                              {enrollment.lesson_count > 0 && (
+                                <div className="text-xs text-muted-foreground">
+                                  {enrollment.completed_lessons_count} of {enrollment.lesson_count} lessons completed
+                                </div>
+                              )}
                             </div>
                             
-                            <Button asChild>
-                              <Link to={`/courses/${enrollment.course_id}`}>
-                                {enrollment.progress && enrollment.progress > 0 ? 'Continue Learning' : 'Start Learning'}
-                              </Link>
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button asChild>
+                                <Link to={`/courses/${enrollment.course_id}`}>
+                                  {enrollment.progress > 0 ? 'Continue Learning' : 'Start Learning'}
+                                </Link>
+                              </Button>
+                              
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" className="flex gap-1 items-center">
+                                    <Trash2 size={16} />
+                                    Remove
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will remove {enrollment.course?.title} from your enrolled courses. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => removeEnrollment(enrollment.id)}>Remove</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
                           </div>
                           
                           <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
@@ -136,7 +227,7 @@ export default function MyLearningPage() {
             </Tab.Panel>
             <Tab.Panel>
               {/* Panel for Completed courses */}
-              {completed.length === 0 ? (
+              {filteredEnrollments.completed.length === 0 ? (
                 <div className="text-center py-12 bg-white dark:bg-brand-900/40 rounded-lg shadow-sm border border-border">
                   <h3 className="text-xl font-medium mb-2">No completed courses</h3>
                   <p className="text-muted-foreground">
@@ -145,7 +236,7 @@ export default function MyLearningPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {completed.map(enrollment => (
+                  {filteredEnrollments.completed.map(enrollment => (
                     <CourseCard 
                       key={enrollment.id}
                       id={enrollment.course_id}

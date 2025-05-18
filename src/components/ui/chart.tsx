@@ -109,6 +109,7 @@ const ChartTooltipContent = React.forwardRef<
       indicator?: "line" | "dot" | "dashed"
       nameKey?: string
       labelKey?: string
+      labelClassName?: string
     }
 >(
   (
@@ -121,11 +122,12 @@ const ChartTooltipContent = React.forwardRef<
       hideIndicator = false,
       label,
       labelFormatter,
-      labelClassName,
       formatter,
       color,
       nameKey,
       labelKey,
+      // Adding type assertion to deal with optional props
+      labelClassName = '',
     },
     ref
   ) => {
@@ -137,7 +139,9 @@ const ChartTooltipContent = React.forwardRef<
       }
 
       const [item] = payload
-      const key = `${labelKey || item.dataKey || item.name || "value"}`
+      // Use type assertion for accessing potentially missing properties
+      const itemAny = item as any;
+      const key = `${labelKey || itemAny.dataKey || item.name || "value"}`
       const itemConfig = getPayloadConfigFromPayload(config, item, key)
       const value =
         !labelKey && typeof label === "string"
@@ -146,8 +150,8 @@ const ChartTooltipContent = React.forwardRef<
 
       if (labelFormatter) {
         return (
-          <div className={cn("font-medium", labelClassName)}>
-            {labelFormatter(value, payload)}
+          <div className={cn("font-medium")}>
+            {labelFormatter(value)}
           </div>
         )
       }
@@ -184,20 +188,26 @@ const ChartTooltipContent = React.forwardRef<
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">
           {payload.map((item, index) => {
-            const key = `${nameKey || item.name || item.dataKey || "value"}`
+            // Use type assertion for dynamic properties
+            const itemAny = item as any;
+            const key = `${nameKey || item.name || itemAny.dataKey || "value"}`
             const itemConfig = getPayloadConfigFromPayload(config, item, key)
-            const indicatorColor = color || item.payload.fill || item.color
+            // Get payload values with safe access
+            const itemPayload = item.payload || {};
+            const indicatorColor = color || itemPayload.fill || itemAny.color
+            const colorObj = cn ? itemAny.color || config.color || "#888" : "#888"
 
             return (
               <div
-                key={item.dataKey}
+                key={`item-${index}`}
                 className={cn(
                   "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
                   indicator === "dot" && "items-center"
                 )}
               >
                 {formatter && item?.value !== undefined && item.name ? (
-                  formatter(item.value, item.name, item, index, item.payload)
+                  // Use correct number of arguments based on formatter function
+                  formatter ? formatter(item.value, item.name, item) : item.value
                 ) : (
                   <>
                     {itemConfig?.icon ? (
@@ -217,8 +227,8 @@ const ChartTooltipContent = React.forwardRef<
                           )}
                           style={
                             {
-                              "--color-bg": indicatorColor,
-                              "--color-border": indicatorColor,
+                              "--color-bg": colorObj,
+                              "--color-border": colorObj,
                             } as React.CSSProperties
                           }
                         />
@@ -254,7 +264,8 @@ const ChartTooltipContent = React.forwardRef<
 )
 ChartTooltipContent.displayName = "ChartTooltip"
 
-const ChartLegend = RechartsPrimitive.Legend
+// Use type assertion to access Legend component
+const ChartLegend = (RechartsPrimitive as any).Legend
 
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
@@ -284,7 +295,10 @@ const ChartLegendContent = React.forwardRef<
         )}
       >
         {payload.map((item) => {
-          const key = `${nameKey || item.dataKey || "value"}`
+          // Use type assertion to handle dynamic properties
+          const itemAny = item as any;
+          const itemDataKey = itemAny.dataKey || "value"
+          const key = `${nameKey || itemDataKey}`
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
 
           return (

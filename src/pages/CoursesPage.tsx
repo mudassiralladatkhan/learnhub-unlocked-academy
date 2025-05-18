@@ -16,7 +16,7 @@ export default function CoursesPage() {
     search,
     category: category === 'all' ? '' : category,
     instructor: instructor === 'all' ? '' : instructor,
-    difficulty: difficulty === 'all' ? '' : difficulty,
+    difficulty: difficulty === 'all' ? '' : difficulty.toLowerCase(), // Ensure lowercase for difficulty
   });
   
   // Extract unique categories and instructors for filters

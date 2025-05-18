@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Star } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSession } from '@/contexts/SessionContext';
 import { useCourse } from '@/hooks/useCourses';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -38,7 +38,7 @@ type ReviewFormValues = z.infer<typeof reviewSchema>;
 
 export default function ReviewPage() {
   const { courseId } = useParams<{ courseId: string }>();
-  const { user } = useAuth();
+  const { user } = useSession();
   const navigate = useNavigate();
   const { course, loading } = useCourse(courseId || '');
   const { toast } = useToast();

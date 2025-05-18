@@ -1,21 +1,45 @@
 
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { useAuth } from '@/contexts/AuthContext';
-import { useEnrollments } from '@/hooks/useEnrollments';
+import { useSession } from '@/contexts/SessionContext';
+import { useEnrollmentsList } from '@/hooks/useEnrollmentsList';
+import { RecommendedCourses } from '@/components/dashboard/RecommendedCourses';
+import { LearningActivity } from '@/components/dashboard/LearningActivity';
+import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const { enrollments, loading } = useEnrollments();
+  const { user, loading: userLoading } = useSession();
+  const { enrollments, loading: enrollmentsLoading } = useEnrollmentsList();
   
-  // Calculate stats
-  const totalCourses = enrollments.length;
-  const inProgressCourses = enrollments.filter(e => e.status === 'in_progress' || e.status === 'enrolled').length;
-  const completedCourses = enrollments.filter(e => e.status === 'completed').length;
-  const averageProgress = enrollments.length > 0
+  // Debug user and session
+  useEffect(() => {
+    console.log("Dashboard page loaded, checking auth state...");
+    if (user) {
+      console.log("✅ Dashboard loaded with authenticated user:", user.id, user.email);
+    } else if (!userLoading) {
+      console.log("⚠️ Dashboard loaded but no user found (not loading state)");
+    } else {
+      console.log("⏳ Dashboard loading user authentication data...");
+    }
+  }, [user, userLoading]);
+  
+  // For Hackathon Demo: Keep showing dashboard even for unauthenticated users
+  // Remove the strict auth requirement for demo purposes
+  // useAuthRedirect({
+  //   requireAuth: true,
+  //   redirectTo: '/login'
+  // });
+  
+  // Calculate stats (use defaults if data isn't available)
+  const loading = userLoading || enrollmentsLoading;
+  const totalCourses = enrollments?.length || 0;
+  const inProgressCourses = enrollments?.filter(e => e.status === 'in_progress' || e.status === 'enrolled')?.length || 0;
+  const completedCourses = enrollments?.filter(e => e.status === 'completed')?.length || 0;
+  const averageProgress = enrollments?.length > 0
     ? enrollments.reduce((sum, e) => sum + (e.progress || 0), 0) / enrollments.length
     : 0;
   
@@ -160,6 +184,18 @@ export default function DashboardPage() {
             </Card>
           )}
           
+          {/* Learning Activity */}
+          {user && (
+            <div className="mb-8">
+              <LearningActivity userId={user.id} days={30} />
+            </div>
+          )}
+          
+          {/* Recommendations - always show, user ID is optional */}
+          <div className="mb-8">
+            <RecommendedCourses userId={user?.id || ''} limit={3} />
+          </div>
+          
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             {/* Course Progress Chart */}
@@ -171,43 +207,48 @@ export default function DashboardPage() {
               <CardContent className="h-[300px]">
                 {progressData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={progressData}
-                      margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
-                    >
-                      <XAxis 
-                        dataKey="name" 
-                        tick={{ fontSize: 12 }}
-                        tickLine={false}
-                        axisLine={false}
-                        interval={0}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12 }}
-                        tickLine={false}
-                        axisLine={false}
-                        domain={[0, 100]}
-                        tickFormatter={(value) => `${value}%`}
-                      />
-                      <Tooltip 
-                        formatter={(value) => `${value}%`}
-                        labelStyle={{ fontWeight: 'bold' }}
-                        contentStyle={{
-                          borderRadius: '8px',
-                          border: '1px solid #ddd',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                        }}
-                      />
-                      <Bar 
-                        dataKey="progress" 
-                        fill="#9b87f5"
-                        radius={[4, 4, 0, 0]} 
-                        animationDuration={1500}
-                      />
-                    </BarChart>
+                    {(() => {
+                      // Use a function to create chart to avoid TypeScript JSX issues
+                      const chart = (
+                        <BarChart
+                          data={progressData}
+                          margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
+                        >
+                          <XAxis 
+                            dataKey="name" 
+                            tick={{ fontSize: 12 }}
+                            tickLine={false}
+                            axisLine={false}
+                            interval={0}
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 12 }}
+                            tickLine={false}
+                            axisLine={false}
+                            domain={[0, 100]}
+                            tickFormatter={(value) => `${value}%`}
+                          />
+                          <Tooltip 
+                            formatter={(value) => `${value}%`}
+                            labelStyle={{ fontWeight: 'bold' }}
+                            contentStyle={{
+                              borderRadius: '8px',
+                              border: '1px solid #ddd',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                            }}
+                          />
+                          <Bar 
+                            dataKey="progress" 
+                            fill="#9b87f5"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      );
+                      return chart;
+                    })()} 
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center">
@@ -226,24 +267,23 @@ export default function DashboardPage() {
               <CardContent className="h-[300px]">
                 {categoryData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
+                    <PieChart width={400} height={300}>
                       <Pie
                         data={categoryData}
                         cx="50%"
                         cy="50%"
-                        outerRadius={100}
-                        innerRadius={60}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
-                        animationDuration={1500}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }: { name: any; percent: any }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       >
                         {categoryData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip 
-                        formatter={(value, name) => [`${value} course${value !== 1 ? 's' : ''}`, name]}
+                        formatter={(value) => `${value} courses`}
                         contentStyle={{
                           borderRadius: '8px',
                           border: '1px solid #ddd',
@@ -251,6 +291,7 @@ export default function DashboardPage() {
                         }}
                       />
                     </PieChart>
+
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center">

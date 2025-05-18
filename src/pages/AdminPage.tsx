@@ -23,13 +23,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSession } from '@/contexts/SessionContext';
 import { useCourses, Course } from '@/hooks/useCourses';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 
 export default function AdminPage() {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user } = useSession();
   const navigate = useNavigate();
   const { courses, loading } = useCourses();
   const { toast } = useToast();

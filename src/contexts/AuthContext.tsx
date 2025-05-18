@@ -1,5 +1,6 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as React from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, User } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -48,18 +49,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // Get user profile
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        try {
+          // Try to get user profile from users table
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
 
-        if (error) {
-          throw error;
+          if (!error) {
+            setUser(data as User);
+          } else {
+            // If users table doesn't exist or other error, fall back to auth data
+            setUser({
+              id: session.user.id,
+              email: session.user.email ?? '',
+              name: session.user.user_metadata?.name as string | null,
+              avatar: session.user.user_metadata?.avatar as string | null
+            });
+          }
+        } catch (error) {
+          // Fallback to auth data if there's any error
+          setUser({
+            id: session.user.id,
+            email: session.user.email ?? '',
+            name: session.user.user_metadata?.name as string | null,
+            avatar: session.user.user_metadata?.avatar as string | null
+          });
         }
-
-        setUser(data as User);
         
         // Check if user is admin (simple implementation - would need proper roles in production)
         // In a real app, you'd have an admins table or a role column
@@ -78,20 +95,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session) {
-          // Get user profile
-          const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          try {
+            // Try to get user profile from users table
+            const { data, error } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
 
-          if (error) {
-            console.error('Error fetching user:', error);
-            setUser(null);
-          } else {
-            setUser(data as User);
-            setIsAdmin(session.user.email === 'admin@learnhub.com');
+            if (!error) {
+              setUser(data as User);
+            } else {
+              // If users table doesn't exist or other error, fall back to auth data
+              setUser({
+                id: session.user.id,
+                email: session.user.email ?? '',
+                name: session.user.user_metadata?.name as string | null,
+                avatar: session.user.user_metadata?.avatar as string | null
+              });
+            }
+          } catch (error) {
+            // Fallback to auth data if there's any error
+            setUser({
+              id: session.user.id,
+              email: session.user.email ?? '',
+              name: session.user.user_metadata?.name as string | null,
+              avatar: session.user.user_metadata?.avatar as string | null
+            });
           }
+          setIsAdmin(session.user.email === 'admin@learnhub.com');
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -110,6 +142,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name,
+            avatar: null
+          }
+        }
       });
 
       if (error) {
@@ -117,18 +155,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        // Create user profile
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            email,
-            name,
-            avatar: null,
-          });
-
-        if (profileError) {
-          throw profileError;
+        try {
+          // Try to create user profile, but don't fail if the table doesn't exist
+          await supabase
+            .from('users')
+            .insert({
+              id: data.user.id,
+              email,
+              name,
+              avatar: null,
+            });
+        } catch (profileError) {
+          // Just log the error but continue - we'll handle the user data from auth.users
+          console.warn("Couldn't create user profile, but auth succeeded:", profileError);
         }
 
         toast({
@@ -163,18 +202,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        // Get user profile
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
+        try {
+          // Try to get user profile from users table
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
 
-        if (userError) {
-          throw userError;
+          if (!userError) {
+            setUser(userData as User);
+          } else {
+            // If users table doesn't exist or other error, fall back to auth data
+            setUser({
+              id: data.user.id,
+              email: data.user.email ?? '',
+              name: data.user.user_metadata?.name as string | null,
+              avatar: data.user.user_metadata?.avatar as string | null
+            });
+          }
+        } catch (err) {
+          // Fallback to auth data if there's any error
+          setUser({
+            id: data.user.id,
+            email: data.user.email ?? '',
+            name: data.user.user_metadata?.name as string | null,
+            avatar: data.user.user_metadata?.avatar as string | null
+          });
         }
-
-        setUser(userData as User);
+        
         setIsAdmin(data.user.email === 'admin@learnhub.com');
         
         toast({
@@ -182,8 +238,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: "You've successfully signed in",
         });
         
-        // Make sure to use navigate here
-        navigate('/dashboard');
+        // Let the LoginPage component handle the navigation via useEffect
+        // This prevents navigation conflicts
       }
     } catch (error: any) {
       console.error('Error signing in:', error);

@@ -1,8 +1,10 @@
 
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, BookOpen, BarChart2, User, Calendar } from 'lucide-react';
 import { useCourse } from '@/hooks/useCourses';
+import { useEnrollmentSimple } from '@/hooks/useEnrollmentSimple';
+import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { StarRating } from '@/components/courses/StarRating';
 import { Badge } from '@/components/ui/badge';
@@ -14,22 +16,47 @@ export default function CourseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { course, loading, error } = useCourse(id || '');
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [enrollmentLoading, setEnrollmentLoading] = useState(false);
+  const { enrollInCourse, isEnrolled: checkIsEnrolled, loading: enrollmentHookLoading } = useEnrollmentSimple();
+  const { user } = useSession();
+  const navigate = useNavigate();
   
+  // Check if user is enrolled
   useEffect(() => {
-    // Check if user is enrolled (would normally come from an enrollment API call)
-    // For now, just simulate with localStorage
-    const enrolledCourses = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-    setIsEnrolled(enrolledCourses.includes(id));
-  }, [id]);
+    const checkEnrollmentStatus = async () => {
+      if (!id || !user) return;
+      
+      try {
+        const enrolled = await checkIsEnrolled(id);
+        setIsEnrolled(enrolled);
+      } catch (error) {
+        console.error('Error checking enrollment status:', error);
+      }
+    };
+    
+    checkEnrollmentStatus();
+  }, [id, user, checkIsEnrolled]);
   
-  const handleEnrollClick = () => {
-    // This would normally be an API call to enroll the user
-    // For now, just simulate with localStorage
-    const enrolledCourses = JSON.parse(localStorage.getItem('enrolledCourses') || '[]');
-    if (!enrolledCourses.includes(id)) {
-      enrolledCourses.push(id);
-      localStorage.setItem('enrolledCourses', JSON.stringify(enrolledCourses));
-      setIsEnrolled(true);
+  // Handle enrollment
+  const handleEnrollClick = async () => {
+    if (!id) return;
+    
+    // If not logged in, redirect to login
+    if (!user) {
+      // Store the current course ID to redirect back after login
+      sessionStorage.setItem('redirectAfterLogin', `/courses/${id}`);
+      navigate('/login');
+      return;
+    }
+    
+    try {
+      // Use the hook's enrollment function
+      const result = await enrollInCourse(id);
+      if (result.success) {
+        setIsEnrolled(true);
+      }
+    } catch (error) {
+      console.error('Error enrolling in course:', error);
     }
   };
   
@@ -173,8 +200,12 @@ export default function CourseDetailPage() {
                     </Button>
                   </div>
                 ) : (
-                  <Button className="w-full" onClick={handleEnrollClick}>
-                    Enroll in Course
+                  <Button 
+                    className="w-full" 
+                    onClick={handleEnrollClick} 
+                    disabled={enrollmentLoading}
+                  >
+                    {enrollmentLoading ? "Enrolling..." : "Enroll in Course"}
                   </Button>
                 )}
                 

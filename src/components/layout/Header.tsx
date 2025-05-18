@@ -12,11 +12,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSession } from '@/contexts/SessionContext';
 import { Menu, Book, User, LogOut, Search } from 'lucide-react';
+import { SearchBar } from '@/components/header/SearchBar';
 
 export function Header() {
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, signOut, isAdmin } = useSession();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -67,9 +68,9 @@ export function Header() {
               {link.name}
             </Link>
           ))}
-          <Link to="/courses" className="p-2 text-gray-600 hover:text-brand-500 dark:text-gray-300 dark:hover:text-brand-400">
-            <Search size={20} />
-          </Link>
+          <div className="hidden lg:block w-64">
+            <SearchBar />
+          </div>
         </nav>
         
         <div className="flex items-center gap-4">
@@ -143,6 +144,11 @@ export function Header() {
                 </Link>
                 
                 <nav className="flex flex-col gap-4">
+                  {/* Mobile Search Bar */}
+                  <div className="px-2 mb-2">
+                    <SearchBar />
+                  </div>
+                  
                   {navigationLinks.map(link => (
                     <Link
                       key={link.name}
